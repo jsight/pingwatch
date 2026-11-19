@@ -19,7 +19,7 @@ The monitor expects `ping` and either `tracepath` or `traceroute` to be installe
 
 ```sh
 cargo build --release
-./target/release/pingwatch
+DATA_DIR=./data ./target/release/pingwatch
 ```
 
 The generic defaults probe Google Public DNS (`8.8.8.8`) and Cloudflare DNS (`1.1.1.1`). Override them with a comma-separated `PING_HOSTS` environment variable. The older single-target `PING_HOST` variable is still supported when `PING_HOSTS` is unset.
@@ -35,9 +35,29 @@ Other settings:
 
 The dashboard listens on port `8787` by default. Configure targets and runtime paths with the environment variables above or with a service manager.
 
-## Service
+## Install as a systemd service
 
-A generic systemd unit and environment example are provided in `conf/`. Review the unit's user, executable, and data paths for the host before installing it.
+On a fresh Linux host with systemd, install Rust/Cargo and the required network tools (`ping` and either `tracepath` or `traceroute`), then run these commands from the project directory:
+
+```sh
+cargo build --release
+sudo useradd --system --user-group --home-dir /var/lib/pingwatch --create-home --shell /usr/sbin/nologin pingwatch
+sudo install -d -o root -g root -m 0755 /opt/pingwatch
+sudo install -m 0755 target/release/pingwatch /opt/pingwatch/pingwatch
+sudo install -d -o pingwatch -g pingwatch -m 0750 /var/lib/pingwatch
+sudo install -m 0644 conf/pingwatch.env.example /etc/default/pingwatch
+sudo install -m 0644 conf/pingwatch.service /etc/systemd/system/pingwatch.service
+```
+
+Edit `/etc/default/pingwatch` to set `PING_HOSTS` to the comma-separated targets you want to monitor. Then enable the service:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now pingwatch.service
+sudo systemctl status pingwatch.service
+```
+
+The included unit runs Pingwatch as a dedicated `pingwatch` user, grants the network capability needed for ping probes, and stores logs under `/var/lib/pingwatch`. The dashboard is available at `http://<host-address>:8787` by default.
 
 ## HTTP endpoints
 
