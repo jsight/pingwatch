@@ -1,0 +1,10 @@
+[package]
+name = "pingwatch"
+version = "0.1.0"
+edition = "2021"
+description = "A small continuous ping monitor with a local web dashboard"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

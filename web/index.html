@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Pingwatch · Network health</title>
+  <style>
+    :root { color-scheme:dark; --bg:#0b1020; --panel:#111a2e; --muted:#93a1bd; --text:#edf3ff; --cyan:#54d6ee; --green:#4ee0a0; --amber:#ffc66d; --red:#ff7185; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(ellipse at 12% -5%,#183052 0,transparent 38%),var(--bg); color:var(--text); font:15px/1.5 ui-sans-serif,system-ui,sans-serif; }
+    main { max-width:1240px; margin:auto; padding:34px 24px 52px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:26px; }
+    .brand { display:flex; align-items:center; gap:13px; }
+    .mark { width:42px;height:42px;border-radius:13px;background:linear-gradient(145deg,#245575,#183252);display:grid;place-items:center;color:var(--cyan);font-size:22px;box-shadow:inset 0 0 0 1px #ffffff13; }
+    h1 { margin:0;font-size:21px;letter-spacing:-.03em; } .sub { color:var(--muted);font-size:13px; }
+    .live { display:flex;align-items:center;gap:8px;color:#b3c0d8;font-size:12px;letter-spacing:.1em;text-transform:uppercase; }
+    .dot { width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 14px #4ee0a080;flex:none; } .dot.bad { background:var(--red);box-shadow:0 0 14px #ff718580; } .dot.wait { background:var(--amber);box-shadow:0 0 12px #ffc66d70; }
+    .cards { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px; }
+    .card,.panel { background:linear-gradient(145deg,#131d33ed,#10182aef);border:1px solid #ffffff0d;border-radius:16px;box-shadow:0 14px 35px #0206112b; }
+    .card { padding:17px 19px; } .target-head { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px; }
+    .target-id { display:flex;align-items:center;gap:10px;min-width:0; } .target-mark { width:9px;height:9px;border-radius:50%;background:var(--target-color);box-shadow:0 0 12px color-mix(in srgb,var(--target-color),transparent 35%);flex:none; }
+    .target-name { font-size:15px;font-weight:650; } .target-host { color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums; }
+    .target-status { display:flex;align-items:center;gap:7px;font-size:11px;color:#b3c0d8;white-space:nowrap; }
+    .target-metrics { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 16px; }
+    .metric-label { color:var(--muted);font-size:10px;letter-spacing:.08em;text-transform:uppercase; }
+    .metric-value { font-size:23px;font-weight:650;letter-spacing:-.04em;margin-top:2px;white-space:nowrap;font-variant-numeric:tabular-nums; }
+    .unit { font-size:12px;color:#a8b6d0;font-weight:500;letter-spacing:0; }
+    .panel { padding:20px 22px;margin-top:15px; }
+    .panel-head { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px; }
+    h2 { font-size:15px;margin:0;font-weight:600; } select { color:var(--text);background:#18233b;border:1px solid #2a3855;border-radius:9px;padding:8px 10px;font:inherit;font-size:12px; }
+    .legend { display:flex;gap:15px;color:var(--muted);font-size:11px;align-items:center;flex-wrap:wrap;justify-content:flex-end; }
+    .legend-item { display:inline-flex;align-items:center;gap:6px;white-space:nowrap; }
+    .legend-line { width:15px;height:3px;border-radius:2px;background:var(--target-color);display:inline-block; }
+    .legend-loss { width:8px;height:8px;border-radius:2px;background:var(--red);display:inline-block; }
+    .chart-wrap { position:relative;height:320px; } canvas { width:100%;height:100%;display:block; }
+    .chart-foot { display:flex;justify-content:space-between;color:#72819f;font-size:11px;margin-top:2px; }
+    .incident { display:flex;align-items:flex-start;gap:12px;border:1px solid #ffffff0b;border-radius:11px;padding:12px 14px;margin-top:9px;background:#ffffff04; }
+    .badge { border-radius:7px;padding:3px 7px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;background:#402b22;color:var(--amber); }
+    .badge.loss { background:#432431;color:var(--red); } .badge.degraded { background:#1e3545;color:var(--cyan); } .inc-title { font-size:13px;font-weight:600; } .inc-meta { color:var(--muted);font-size:12px;margin-top:2px; }
+    .route-summary { display:grid;grid-template-columns:minmax(220px,.8fr) minmax(0,2fr);gap:14px;margin:14px 0; }
+    .route-highlight,.route-current { background:#ffffff04;border:1px solid #ffffff0b;border-radius:12px;padding:15px 16px;min-width:0; }
+    .route-value { font-size:21px;font-weight:650;letter-spacing:-.03em;margin-top:5px;overflow-wrap:anywhere; }
+    .route-hops { display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:10px; }
+    .route-hop { background:#1b2942;border:1px solid #ffffff0d;border-radius:8px;padding:6px 9px;font-size:11px;color:#d7e1f3;font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
+    .route-hop.external { border-color:#54d6ee65;color:#b8f2fb; }
+    .route-arrow { color:#63728e;font-size:12px; }
+    .route-history { display:grid;gap:7px;margin-top:12px; }
+    .route-row { display:grid;grid-template-columns:120px minmax(150px,.7fr) minmax(0,2fr) auto;gap:12px;align-items:center;border-top:1px solid #ffffff0b;padding:10px 2px;font-size:12px; }
+    .route-time { color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap; }
+    .route-first { font-weight:600;overflow-wrap:anywhere; }
+    .route-path-text { color:#8291ac;overflow-wrap:anywhere;font-size:11px; }
+    .route-change { border-radius:6px;padding:3px 6px;color:var(--amber);background:#402b22;font-size:10px;text-transform:uppercase;white-space:nowrap; }
+    .route-same { color:#6d7b94;font-size:10px;white-space:nowrap; }
+    .empty { color:var(--muted);padding:20px 2px;font-size:13px; } footer { color:#667591;font-size:11px;text-align:center;margin-top:24px; }
+    @media(max-width:1000px){ main{padding:25px 16px 40px}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.panel{padding:18px 16px}.chart-wrap{height:270px} }
+    @media(max-width:700px){ .route-summary{grid-template-columns:1fr}.route-row{grid-template-columns:92px minmax(100px,.7fr) minmax(0,2fr)}.route-row .route-state{display:none} }
+    @media(max-width:560px){ main{padding:20px 12px 34px}.cards{grid-template-columns:1fr;gap:10px}.card{padding:15px 16px}.target-metrics{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.metric-value{font-size:19px}.metric-label{font-size:9px}.panel-head{align-items:flex-start;flex-direction:column}.panel-head.tools{flex-direction:row;align-items:center}.chart-wrap{height:235px}header{align-items:flex-start}.live{font-size:10px}.route-row{grid-template-columns:1fr auto;gap:4px 10px}.route-time{grid-column:1}.route-first{grid-column:1}.route-path-text{grid-column:1/-1}.route-row .route-state{display:block;grid-column:2;grid-row:1/3} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand"><div class="mark">⌁</div><div><h1>Pingwatch</h1><div class="sub">Comparative reachability · gateways and public resolvers</div></div></div>
+    <div class="live"><span class="dot wait" id="overall-dot"></span><span id="overall-status">Connecting</span></div>
+  </header>
+  <section class="cards" id="target-cards"></section>
+  <section class="panel">
+    <div class="panel-head tools"><h2>Latency and packet loss by target</h2><div style="display:flex;gap:16px;align-items:center"><div class="legend" id="legend"></div><select id="range" aria-label="Chart time range"><option value="900">15 minutes</option><option value="3600" selected>1 hour</option><option value="21600">6 hours</option><option value="86400">24 hours</option></select></div></div>
+    <div class="chart-wrap"><canvas id="chart"></canvas></div><div class="chart-foot"><span id="chart-start">—</span><span>500 ms threshold · marks at bottom show loss per target</span><span id="chart-end">Now</span></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><h2>Hourly route to Google DNS</h2><span class="sub" id="route-checked">First trace runs at startup</span></div>
+    <div class="route-summary">
+      <div class="route-highlight"><div class="metric-label">First public hop</div><div class="route-value" id="first-public-hop">Waiting for first trace</div><div class="sub" id="first-public-detail">Private gateway hops are skipped automatically.</div></div>
+      <div class="route-current"><div class="metric-label">Current path</div><div class="route-hops" id="route-hops"><span class="sub">Waiting for route check.</span></div></div>
+    </div>
+    <div id="route-history" class="route-history"></div>
+  </section>
+  <section class="panel"><div class="panel-head"><h2>Significant events</h2><span class="sub">5 consecutive misses · 60 seconds above 500 ms · mixed degradation over 60 seconds</span></div><div id="incidents" class="empty">No significant events recorded.</div></section>
+  <footer>Each target is probed independently every second · Refreshes every 5 seconds · 24 hours in memory, 30 days of logs</footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let payload = null;
+const colors = {'8.8.8.8':'#54d6ee','1.1.1.1':'#b69cff'};
+function colorFor(host,index) { return colors[host] || ['#54d6ee','#b69cff','#ffc66d','#4ee0a0'][index%4]; }
+function labelFor(host) { return ({'8.8.8.8':'Google DNS','1.1.1.1':'Cloudflare DNS'})[host] || 'Target'; }
+function esc(value) {
+  const entities = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+  return String(value).replace(/[&<>"']/g, ch => entities[ch]);
+}
+function duration(s) { if(s<60)return `${s}s`;const m=Math.floor(s/60);if(m<60)return `${m}m ${s%60}s`;const h=Math.floor(m/60);return `${h}h ${m%60}m`; }
+function time(ts) { return new Date(ts*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+function metric(v,unit='ms') { return v==null?'—':`${Number(v).toFixed(unit==='%'?2:1)}<span class="unit"> ${unit}</span>`; }
+function renderTargets(targets) {
+  $('target-cards').innerHTML=targets.map((t,i)=>{
+    const color=colorFor(t.host,i), latest=t.latest, fresh=latest&&(payload.generated_at-latest.ts)<=6;
+    const up=fresh&&latest.success, status=!latest?'Waiting':!fresh?'Stale':up?'Reachable':'No reply';
+    const s=t.windows['5m'];
+    return `<article class="card"><div class="target-head"><div class="target-id"><i class="target-mark" style="--target-color:${color}"></i><div><div class="target-name">${esc(labelFor(t.host))}</div><div class="target-host">${esc(t.host)}</div></div></div><div class="target-status"><span class="dot ${!latest?'wait':up?'':'bad'}"></span>${status}</div></div><div class="target-metrics"><div><div class="metric-label">Current</div><div class="metric-value">${metric(up?latest.rtt_ms:null)}</div></div><div><div class="metric-label">Avg · 5m</div><div class="metric-value">${metric(s.avg_ms)}</div></div><div><div class="metric-label">Loss · 5m</div><div class="metric-value">${metric(s.loss_pct,'%')}</div></div><div><div class="metric-label">Peak · 5m</div><div class="metric-value">${metric(s.max_ms)}</div></div></div></article>`;
+  }).join('');
+  $('legend').innerHTML=targets.map((t,i)=>`<span class="legend-item"><i class="legend-line" style="--target-color:${colorFor(t.host,i)}"></i>${esc(labelFor(t.host))}</span>`).join('')+'<span class="legend-item"><i class="legend-loss"></i>Loss</span>';
+  const responding=targets.filter(t=>t.latest&&t.latest.success&&(payload.generated_at-t.latest.ts)<=6).length;
+  $('overall-status').textContent=`${responding} / ${targets.length} reachable`;
+  $('overall-dot').className=`dot ${responding===targets.length?'':responding===0?'bad':'wait'}`;
+}
+function renderIncidents(targets) {
+  const all=targets.flatMap(t=>t.incidents.map(e=>({...e,host:t.host})));
+  const mixed=all.filter(e=>e.kind==='degradation');
+  const covered=e=>mixed.some(d=>{
+    if(d.host!==e.host||d===e)return false;
+    const eEnd=e.ended_at===null?payload.generated_at:e.ended_at;
+    const dEnd=d.ended_at===null?payload.generated_at:d.ended_at;
+    return e.started_at<=dEnd+20&&d.started_at<=eEnd+20;
+  });
+  const events=all.filter(e=>e.kind==='degradation'||!covered(e)).sort((a,b)=>b.started_at-a.started_at).slice(0,30);
+  if(!events.length){$('incidents').className='empty';$('incidents').textContent='No significant events recorded.';return;}
+  $('incidents').className='';
+  $('incidents').innerHTML=events.map(e=>{
+    const mixed=e.kind==='degradation',loss=e.kind==='packet_loss',title=mixed?'Mixed connection degradation':loss?'Packet loss':'High latency';
+    const ended=e.ended_at===null?'ongoing':`lasted ${duration(e.duration_secs)}`;
+    const slowSamples=Math.max(0,Number(e.samples||0)-Number(e.lost_samples||0));
+    const detail=mixed?`${slowSamples} replies ≥500 ms · ${e.lost_samples} missed probes · peak ${Number(e.peak_ms||0).toFixed(1)} ms`:
+      loss?`${e.samples} consecutive probes missed`:`${duration(e.duration_secs)} above 500 ms · peak ${Number(e.peak_ms||0).toFixed(1)} ms`;
+    const badge=mixed?'Mixed':loss?'Loss':'Latency',badgeClass=mixed?'degraded':loss?'loss':'';
+    return `<div class="incident"><span class="badge ${badgeClass}">${badge}</span><div><div class="inc-title">${title} · ${esc(labelFor(e.host))} (${esc(e.host)})${e.ended_at===null?' · active':''}</div><div class="inc-meta">Started ${time(e.started_at)} · ${detail} · ${ended}</div></div></div>`;
+  }).join('');
+}
+function rgba(hex,alpha) { const n=parseInt(hex.slice(1),16);return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${alpha})`; }
+function draw(targets) {
+  const canvas=$('chart'),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  canvas.width=Math.max(1,Math.round(rect.width*dpr));canvas.height=Math.max(1,Math.round(rect.height*dpr));
+  const c=canvas.getContext('2d');c.scale(dpr,dpr);const w=rect.width,h=rect.height;
+  const pad={l:50,r:12,t:12,b:23},cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+  c.clearRect(0,0,w,h);
+  const points=targets.flatMap(t=>t.series),values=points.flatMap(p=>[p.max_ms,p.avg_ms]).filter(v=>v!==null);
+  const max=Math.max(500,Math.ceil(Math.max(...values,500)*1.12/100)*100),ticks=4;
+  c.font='11px system-ui';c.textAlign='right';c.textBaseline='middle';
+  for(let i=0;i<=ticks;i++){const y=pad.t+ch*i/ticks,value=max*(1-i/ticks);c.strokeStyle='#ffffff12';c.beginPath();c.moveTo(pad.l,y);c.lineTo(w-pad.r,y);c.stroke();c.fillStyle='#8190ad';c.fillText(`${Math.round(value)} ms`,pad.l-8,y);}
+  const thresholdY=pad.t+ch*(1-500/max);c.setLineDash([5,5]);c.strokeStyle='#ffc66d70';c.beginPath();c.moveTo(pad.l,thresholdY);c.lineTo(w-pad.r,thresholdY);c.stroke();c.setLineDash([]);
+  const timestamps=targets.flatMap(t=>t.series.map(p=>p.ts));
+  if(!timestamps.length)return;
+  const seconds=Number($('range').value),latest=Math.max(...timestamps),first=Math.min(...timestamps),start=Math.max(latest-seconds,first),span=Math.max(1,latest-start);
+  const x=ts=>pad.l+Math.max(0,Math.min(1,(ts-start)/span))*cw,y=v=>pad.t+ch*(1-(v||0)/max);
+  targets.forEach((target,index)=>{
+    const color=colorFor(target.host,index),series=target.series;
+    const bucketWidth=Math.max(2,cw/Math.max(1,series.length))*1.4;
+    series.forEach(p=>{if(p.loss_pct>0){c.fillStyle=rgba(color,Math.min(.9,.25+p.loss_pct/100*.65));c.fillRect(x(p.ts)-bucketWidth/2,pad.t+ch-5-index*5,bucketWidth,4);}});
+    const valid=series.map(p=>p).filter(p=>p.max_ms!==null);
+    if(valid.length){c.beginPath();valid.forEach((p,i)=>{if(i===0)c.moveTo(x(p.ts),y(p.max_ms));else c.lineTo(x(p.ts),y(p.max_ms));});[...valid].reverse().forEach(p=>c.lineTo(x(p.ts),y(p.min_ms)));c.closePath();c.fillStyle=rgba(color,.10);c.fill();}
+    c.beginPath();let started=false;series.forEach(p=>{if(p.avg_ms===null){started=false;return;}if(!started){c.moveTo(x(p.ts),y(p.avg_ms));started=true;}else c.lineTo(x(p.ts),y(p.avg_ms));});c.strokeStyle=color;c.lineWidth=2;c.stroke();
+  });
+  $('chart-start').textContent=time(start);$('chart-end').textContent=time(latest);
+}
+function routeSignature(route) { return route.hops.map(h=>h.ttl+':'+(h.ip||h.address)).join('>'); }
+function hopText(hop) { return hop.ip&&hop.ip!==hop.address?hop.ip+' · '+hop.address:hop.address; }
+function renderRoute(data) {
+  const latest=data&&data.latest,history=data&&data.history||[];
+  if(!latest){$('route-checked').textContent='Waiting for the first trace';return;}
+  $('route-checked').textContent='Last checked '+time(latest.ts)+' · repeats hourly';
+  const first=latest.first_external_hop;
+  $('first-public-hop').textContent=first?(first.ip||first.address):'No public hop found';
+  $('first-public-detail').textContent=first
+    ?'Hop '+first.ttl+' · '+hopText(first)+' · '+(first.rtt_ms==null?'RTT unavailable':Number(first.rtt_ms).toFixed(1)+' ms')
+    :(latest.error||'The trace did not identify an external hop.');
+  const steps=latest.hops.map((hop,index)=>{
+    const external=first&&hop.ttl===first.ttl&&hop.address===first.address;
+    const rtt=hop.rtt_ms==null?'':' · '+Number(hop.rtt_ms).toFixed(1)+' ms';
+    return (index?'<span class="route-arrow">→</span>':'')+'<span class="route-hop '+(external?'external':'')+'"><b>'+hop.ttl+'</b> '+esc(hop.address)+rtt+'</span>';
+  }).join('');
+  $('route-hops').innerHTML=steps||'<span class="sub">'+esc(latest.error||'No responding hops.')+'</span>';
+  const firstIndex=Math.max(0,history.length-12);
+  const rows=history.slice(firstIndex).map((route,index)=>({route,index:firstIndex+index})).reverse();
+  $('route-history').innerHTML=rows.map(({route,index})=>{
+    const hop=route.first_external_hop,prior=index>0?history[index-1]:null;
+    const changed=prior&&routeSignature(prior)&&routeSignature(route)&&routeSignature(prior)!==routeSignature(route);
+    const firstLabel=hop?hopText(hop):(route.error||'No public hop found');
+    const path=route.hops.map(h=>h.ip||h.address).join(' → ')||'No responding hops';
+    return '<div class="route-row"><span class="route-time">'+time(route.ts)+'</span><span class="route-first">'+esc(firstLabel)+'</span><span class="route-path-text">'+esc(path)+'</span><span class="route-state">'+(changed?'<span class="route-change">Path changed</span>':'<span class="route-same">—</span>')+'</span></div>';
+  }).join('');
+}
+async function refresh() {
+  try {
+    const seconds=$('range').value,res=await fetch(`/api/state?seconds=${seconds}`,{cache:'no-store'});if(!res.ok)throw Error('request failed');
+    payload=await res.json();renderTargets(payload.targets);renderIncidents(payload.targets);renderRoute(payload.route_trace);draw(payload.targets);
+  } catch(e) {$('overall-status').textContent='Dashboard unavailable';$('overall-dot').className='dot bad';}
+}
+$('range').addEventListener('change',refresh);window.addEventListener('resize',()=>payload&&draw(payload.targets));refresh();setInterval(refresh,5000);
+</script>
+</body>
+</html>

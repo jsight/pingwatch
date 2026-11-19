@@ -1,0 +1,8 @@
+/target
+*.swp
+.env
+.env.*
+*.log
+*.jsonl
+/data/
+/conf/*.local.*

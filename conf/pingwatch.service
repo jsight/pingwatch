@@ -1,0 +1,27 @@
+[Unit]
+Description=Pingwatch continuous network monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pingwatch
+Group=pingwatch
+EnvironmentFile=-/etc/default/pingwatch
+Environment=PING_INTERVAL_SECS=1
+Environment=PING_TIMEOUT_SECS=10
+Environment=LISTEN_ADDR=0.0.0.0:8787
+Environment=DATA_DIR=/var/lib/pingwatch
+ExecStart=/opt/pingwatch/pingwatch
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pingwatch
+
+[Install]
+WantedBy=multi-user.target
